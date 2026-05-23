@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Upload CV — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Upload Your CV</h1>
+  <p>PDF only · Max 5 MB · Skills are extracted automatically using AI</p>
+</div>
+
+<div class="form-card">
+  <form method="POST" enctype="multipart/form-data" class="stack-form">
+
+    <div class="upload-zone" id="dropZone">
+      <div class="upload-icon">📄</div>
+      <p>Drag & drop your PDF CV here, or click to browse</p>
+      <input type="file" name="cv_file" id="cv_file" accept=".pdf" {% if not cv %}required{% endif %}
+             onchange="document.getElementById('filename').textContent = this.files[0]?.name || ''"/>
+      <p class="filename" id="filename">
+        {% if cv and cv.filename %}Currently: {{ cv.filename }}{% endif %}
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Additional / manual skills <span class="hint">(comma-separated, supplement auto-extraction)</span></label>
+      <input type="text" name="manual_skills"
+             placeholder="e.g. python, react, postgresql, docker"
+             value="{% if cv %}{{ cv.get_skills()|join(', ') }}{% endif %}"/>
+      <p class="field-note">These skills will be merged with those automatically extracted from your PDF.</p>
+    </div>
+
+    {% if cv %}
+    <div class="info-box">
+      <strong>Current extracted skills:</strong><br/>
+      <div class="skill-tags mt-sm">
+        {% for skill in cv.get_skills() %}
+          <span class="tag">{{ skill }}</span>
+        {% else %}
+          <span class="muted">None extracted yet</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Upload & Extract Skills</button>
+      <a href="{{ url_for('student.dashboard') }}" class="btn-ghost">Back to dashboard</a>
+    </div>
+  </form>
+</div>
+
+<script>
+const zone = document.getElementById('dropZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.querySelector('input[name=cv_file]').files = e.dataTransfer.files;
+    document.getElementById('filename').textContent = file.name;
+  }
+});
+zone.addEventListener('click', () => document.getElementById('cv_file').click());
+</script>
+{% endblock %}

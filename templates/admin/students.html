@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}All Students — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Registered Students</h1><p>{{ students|length }} total</p></div>
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>Name</th><th>University</th><th>Department</th><th>Level</th><th>Location</th><th>CV</th><th>Joined</th></tr></thead>
+    <tbody>
+    {% for s in students %}
+    <tr>
+      <td><strong>{{ s.name }}</strong><br/><small>{{ s.email }}</small></td>
+      <td>{{ s.university }}</td>
+      <td>{{ s.department }}</td>
+      <td>{{ s.level }}</td>
+      <td>{{ s.location }}</td>
+      <td>{% if s.cv %}<span class="badge-ok">✓ Uploaded</span>{% else %}<span class="badge-warn">Pending</span>{% endif %}</td>
+      <td><small>{{ s.created_at.strftime('%d %b %Y') }}</small></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

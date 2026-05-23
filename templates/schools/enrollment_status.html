@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Enrollment Status{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Enrollment Status</h1>
+  <p>{{ enrollment.course.name }} · {{ enrollment.school.name }}</p>
+</div>
+
+{% set status_map = {
+  "pending_payment": ("⏳", "Pending Payment",  "amber", "Your enrollment has been submitted. Await payment confirmation from the school."),
+  "paid":            ("💳", "Payment Received", "accent","Payment confirmed. Your enrollment is being processed."),
+  "enrolled":        ("✅", "Enrolled",         "green", "You are fully enrolled. Check your email for next steps."),
+  "rejected":        ("❌", "Not Accepted",     "red",   "Your enrollment was not accepted. Please contact the school for details."),
+} %}
+
+{% set icon, label, col, note = status_map.get(enrollment.status, ("❓","Unknown","muted","")) %}
+
+<div class="result-hero">
+  <div class="result-company">
+    <span class="result-icon">{{ icon }}</span>
+    <div>
+      <h2>{{ label }}</h2>
+      <p>{{ enrollment.course.name }}</p>
+      <p class="muted" style="font-size:.85rem">{{ enrollment.school.name }}</p>
+    </div>
+  </div>
+  <div class="score-circle {{ col }}">
+    <span>{{ enrollment.test_score|int }}%</span>
+    <small>Test</small>
+  </div>
+</div>
+
+<div class="dash-grid">
+  <div class="card">
+    <h3>Enrollment Details</h3>
+    <table class="info-table">
+      <tr><td>Course</td><td>{{ enrollment.course.name }}</td></tr>
+      <tr><td>School</td><td>{{ enrollment.school.name }}</td></tr>
+      <tr><td>SIWES Fee</td>
+          <td style="color:var(--green);font-weight:700">₦{{ "{:,}".format(enrollment.amount_ngn or 0) }}</td></tr>
+      <tr><td>Status</td>
+          <td><span class="score-pill {{ col }}">{{ label }}</span></td></tr>
+      <tr><td>Submitted</td>
+          <td>{{ enrollment.enrolled_at.strftime("%d %b %Y at %H:%M") }}</td></tr>
+      {% if enrollment.confirmed_at %}
+      <tr><td>Confirmed</td>
+          <td>{{ enrollment.confirmed_at.strftime("%d %b %Y at %H:%M") }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Next Steps</h3>
+    <div class="info-box">{{ note }}</div>
+    {% if enrollment.status == "pending_payment" %}
+    <p class="muted mt" style="font-size:.85rem">
+      Please check your registered email for payment instructions from
+      <strong>{{ enrollment.school.name }}</strong>. Payment contact:
+      <strong>{{ enrollment.school.contact_email or "admissions@" + enrollment.school.name.lower().split()[0] + ".ng" }}</strong>
+    </p>
+    {% elif enrollment.status == "enrolled" %}
+    <div class="discount-banner mt">
+      🎉 Congratulations! Present your SIWES letter to the school to begin your programme.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<a href="{{ url_for('schools.listing') }}" class="btn-ghost mt">← Browse other schools</a>
+{% endblock %}

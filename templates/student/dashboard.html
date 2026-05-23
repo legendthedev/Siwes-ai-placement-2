@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Welcome, {{ student.name.split()[0] if student else "Student" }} 👋</h1>
+  <p>{{ student.department }} · {{ student.university }} · {{ student.level }} Level</p>
+</div>
+
+<div class="dash-grid">
+
+  <!-- Status card -->
+  <div class="card status-card {% if placement %}placed{% elif student and student.cv %}ready{% else %}incomplete{% endif %}">
+    {% if placement %}
+      <div class="status-icon">✅</div>
+      <h3>Placement Confirmed</h3>
+      <p>You have been matched to <strong>{{ company.name }}</strong></p>
+      <p class="score-line">Match score: <strong>{{ "%.1f"|format(placement.match_score * 100) }}%</strong></p>
+      <a href="{{ url_for('student.result') }}" class="btn-primary">View full result →</a>
+    {% elif student and student.cv %}
+      <div class="status-icon">🕐</div>
+      <h3>Profile Ready</h3>
+      <p>Your CV is uploaded. Awaiting the next placement run.</p>
+      <a href="{{ url_for('student.upload_cv') }}" class="btn-outline">Update CV</a>
+    {% else %}
+      <div class="status-icon">⚠️</div>
+      <h3>Action Required</h3>
+      <p>Upload your CV to be included in placement matching.</p>
+      <a href="{{ url_for('student.upload_cv') }}" class="btn-primary">Upload CV now →</a>
+    {% endif %}
+  </div>
+
+  <!-- Profile summary -->
+  <div class="card">
+    <h3>Profile Summary</h3>
+    {% if student %}
+    <table class="info-table">
+      <tr><td>Name</td><td>{{ student.name }}</td></tr>
+      <tr><td>University</td><td>{{ student.university }}</td></tr>
+      <tr><td>Department</td><td>{{ student.department }}</td></tr>
+      <tr><td>Level</td><td>{{ student.level }}</td></tr>
+      <tr><td>Location</td><td>{{ student.location }}</td></tr>
+      <tr><td>Matric No.</td><td>{{ student.matric_no or "—" }}</td></tr>
+    </table>
+    {% endif %}
+    <a href="{{ url_for('student.profile') }}" class="btn-ghost mt">Edit profile</a>
+  </div>
+
+  <!-- Skills card -->
+  <div class="card">
+    <h3>Extracted Skills</h3>
+    {% if student and student.cv %}
+      <div class="skill-tags">
+        {% for skill in student.cv.get_skills() %}
+          <span class="tag">{{ skill }}</span>
+        {% else %}
+          <p class="muted">No skills extracted yet. Upload your CV.</p>
+        {% endfor %}
+      </div>
+      <a href="{{ url_for('student.upload_cv') }}" class="btn-ghost mt">Update skills</a>
+    {% else %}
+      <p class="muted">Upload your CV to extract skills automatically.</p>
+      <a href="{{ url_for('student.upload_cv') }}" class="btn-primary mt">Upload CV →</a>
+    {% endif %}
+  </div>
+
+  <!-- Quick links -->
+  <div class="card">
+    <h3>Quick Links</h3>
+    <div class="quick-links">
+      <a href="{{ url_for('student.upload_cv') }}" class="quick-link">📄 Upload / Update CV</a>
+      <a href="{{ url_for('student.profile') }}" class="quick-link">✏️ Edit Profile</a>
+      <a href="{{ url_for('student.result') }}" class="quick-link">🏆 View Placement Result</a>
+      <a href="{{ url_for('placement.results') }}" class="quick-link">📊 All Results</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My Profile — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Edit Profile</h1>
+</div>
+<div class="form-card wide">
+  <form method="POST" class="grid-form">
+    <div class="field"><label>Full name</label>
+      <input type="text" name="name" value="{{ student.name }}" required/></div>
+    <div class="field"><label>Phone</label>
+      <input type="tel" name="phone" value="{{ student.phone or '' }}"/></div>
+    <div class="field"><label>University</label>
+      <input type="text" name="university" value="{{ student.university }}" required/></div>
+    <div class="field"><label>Department</label>
+      <select name="department" required>
+        {% for d in ["Computer Science","Software Engineering","Information Technology",
+                     "Computer Engineering","Electrical Electronics","Data Science","Cyber Security"] %}
+          <option value="{{ d }}" {% if student.department==d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Level</label>
+      <select name="level">
+        <option value="300" {% if student.level==300 %}selected{% endif %}>300 Level</option>
+        <option value="400" {% if student.level==400 %}selected{% endif %}>400 Level</option>
+      </select></div>
+    <div class="field"><label>Preferred location</label>
+      <select name="location">
+        {% for loc in ["Victoria Island","Lekki","Yaba","Ikeja","Ikoyi","Surulere","Ajah","Lagos Island","Any Lagos"] %}
+          <option value="{{ loc }}" {% if student.location==loc %}selected{% endif %}>{{ loc }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field full-width"><label>Bio</label>
+      <textarea name="bio" rows="3">{{ student.bio or '' }}</textarea></div>
+    <div class="field"><label>LinkedIn</label>
+      <input type="url" name="linkedin" value="{{ student.linkedin or '' }}"/></div>
+    <div class="field"><label>GitHub</label>
+      <input type="url" name="github" value="{{ student.github or '' }}"/></div>
+    <div class="field full-width actions">
+      <button type="submit" class="btn-primary">Save changes</button>
+      <a href="{{ url_for('student.dashboard') }}" class="btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

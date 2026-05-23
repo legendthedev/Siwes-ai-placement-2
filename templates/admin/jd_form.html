@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if jd else "Add" }} Job Role — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ "Edit Job Role" if jd else "Add New Job Role" }}</h1>
+  <p>{{ company.name }}</p>
+</div>
+
+<div class="form-card wide">
+  <form method="POST" class="grid-form">
+
+    <div class="field">
+      <label>Role title *</label>
+      <input type="text" name="title" value="{{ jd.title if jd else '' }}"
+             placeholder="e.g. Backend Engineering Intern" required/>
+    </div>
+    <div class="field">
+      <label>Target department</label>
+      <select name="target_department">
+        <option value="">Any CS department</option>
+        {% for d in ["Computer Science","Software Engineering","Information Technology",
+                     "Computer Engineering","Electrical Electronics","Data Science","Cyber Security"] %}
+          <option value="{{ d }}" {% if jd and jd.target_department==d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Work location *</label>
+      <select name="location" required>
+        {% for loc in ["Victoria Island","Lekki","Yaba","Ikeja","Ikoyi","Apapa","Surulere","Lagos Island","Any Lagos"] %}
+          <option value="{{ loc }}"
+            {% if jd and jd.location==loc %}selected
+            {% elif not jd and loc == company.location %}selected{% endif %}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Student quota *<span class="hint"> (max number of students for this role)</span></label>
+      <input type="number" name="quota" value="{{ jd.quota if jd else 1 }}" min="1" max="20" required/>
+    </div>
+
+    <div class="field full-width">
+      <label>Required skills * <span class="hint">(comma-separated)</span></label>
+      <input type="text" name="required_skills"
+             value="{{ skills_csv if skills_csv is defined else '' }}"
+             placeholder="e.g. python, django, postgresql, rest api, git, docker" required/>
+      <p class="field-note">These are used by the AI to compute cosine similarity scores between student CVs and this role.</p>
+    </div>
+
+    <div class="field full-width">
+      <label>Job description *</label>
+      <textarea name="raw_text" rows="6" required
+                placeholder="Describe the role, responsibilities, what the intern will work on, your tech stack, and any other details...">{{ jd.raw_text if jd else '' }}</textarea>
+    </div>
+
+    <div class="field full-width">
+      <label>Additional placement requirements <span class="hint">(optional)</span></label>
+      <textarea name="additional_requirements" rows="3"
+                placeholder="e.g. Must have own laptop · Must be available 5 days/week · CGPA minimum 3.0">{{ jd.additional_requirements if jd else '' }}</textarea>
+    </div>
+
+    <div class="field full-width actions">
+      <button type="submit" class="btn-primary">{{ "Save Changes" if jd else "Add Job Role" }}</button>
+      <a href="{{ url_for('admin.dashboard') }}" class="btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

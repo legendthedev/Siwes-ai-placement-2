@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Applicants — {{ jd.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Matched Students</h1>
+  <p>{{ jd.title }} · {{ company.name }}</p>
+</div>
+{% if placements %}
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>Student</th><th>University</th><th>Department</th><th>Level</th><th>Match Score</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for p, s in placements %}
+    <tr>
+      <td><strong>{{ s.name }}</strong><br/><small>{{ s.email }}</small></td>
+      <td>{{ s.university }}</td>
+      <td>{{ s.department }}</td>
+      <td>{{ s.level }}</td>
+      <td><span class="score-pill {% if p.match_score >= 0.75 %}high{% elif p.match_score >= 0.5 %}mid{% else %}low{% endif %}">
+        {{ "%.1f"|format(p.match_score * 100) }}%
+      </span></td>
+      <td>{{ p.status }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><p>No students matched to this role yet. Run the placement algorithm from your dashboard.</p></div>
+{% endif %}
+<a href="{{ url_for('admin.dashboard') }}" class="btn-ghost mt">← Back to dashboard</a>
+{% endblock %}

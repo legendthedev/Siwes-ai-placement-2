@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ company.name if company else "Company Dashboard" }}</h1>
+  <p class="sub-meta">
+    {{ company.industry }} · {{ company.location }}
+    {% if company and not company.verified %}
+      <span class="badge-warn" style="margin-left:.6rem">⏳ Pending verification</span>
+    {% else %}
+      <span class="badge-ok" style="margin-left:.6rem">✅ Verified</span>
+    {% endif %}
+  </p>
+</div>
+
+<!-- ── Stat row ─────────────────────────────────────────── -->
+<div class="stats-row">
+  <div class="stat-card">
+    <span class="stat-num">{{ jds|length }}</span>
+    <span class="stat-label">Job Roles</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ total_quota }}</span>
+    <span class="stat-label">Total Quota</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ remaining_total }}</span>
+    <span class="stat-label">Remaining Slots</span>
+  </div>
+  <div class="stat-card {% if placements %}accent{% endif %}">
+    <span class="stat-num">{{ placements|length }}</span>
+    <span class="stat-label">Students Placed</span>
+  </div>
+</div>
+
+<!-- ── Job descriptions ───────────────────────────────────── -->
+<div class="section-header">
+  <h2>Job Descriptions</h2>
+  <a href="{{ url_for('admin.add_jd') }}" class="btn-primary">+ Add Role</a>
+</div>
+
+{% if jds %}
+<div class="table-card" x-data="{ query: '' }">
+  <div class="table-toolbar">
+    <input class="table-search" type="text" x-model="query" placeholder="Search roles…"/>
+    <span class="table-count">{{ jds|length }} role(s)</span>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Role</th><th>Department</th><th>Location</th>
+        <th>Quota</th><th>Remaining</th><th>Fill %</th>
+        <th>Skills</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for jd in jds %}
+      {% set placed_here = jd_placed_counts.get(jd.id, 0) %}
+      {% set remaining   = jd.remaining_quota if jd.remaining_quota is not none else jd.quota %}
+      {% set fill_pct    = ((jd.quota - remaining) / jd.quota * 100)|int if jd.quota else 0 %}
+      <tr x-show="!query || '{{ jd.title }} {{ jd.target_department }} {{ jd.location }}'.toLowerCase().includes(query.toLowerCase())">
+        <td><strong>{{ jd.title }}</strong></td>
+        <td>{{ jd.target_department or "Any" }}</td>
+        <td>{{ jd.location }}</td>
+        <td><span class="badge-quota">{{ jd.quota }}</span></td>
+        <td>
+          <span class="badge-{% if remaining == 0 %}warn{% elif remaining <= 1 %}warn{% else %}ok{% endif %}">
+            {{ remaining }} left
+          </span>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <div style="flex:1;background:var(--border);border-radius:3px;height:6px;min-width:50px">
+              <div style="width:{{ fill_pct }}%;height:100%;background:{% if fill_pct==100 %}var(--green){% elif fill_pct>50 %}var(--amber){% else %}var(--accent){% endif %};border-radius:3px;transition:width .5s"></div>
+            </div>
+            <span style="font-size:.75rem;color:var(--muted)">{{ fill_pct }}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="skill-tags compact">
+            {% for s in jd.get_required_skills()[:3] %}<span class="tag sm">{{ s }}</span>{% endfor %}
+            {% if jd.get_required_skills()|length > 3 %}
+              <span class="tag sm muted">+{{ jd.get_required_skills()|length - 3 }}</span>
+            {% endif %}
+          </div>
+        </td>
+        <td class="actions-cell">
+          <a href="{{ url_for('admin.edit_jd', jd_id=jd.id) }}" class="btn-xs">Edit</a>
+          <a href="{{ url_for('admin.jd_applicants', jd_id=jd.id) }}" class="btn-xs outline">
+            {{ placed_here }} placed
+          </a>
+          <form method="POST" action="{{ url_for('admin.delete_jd', jd_id=jd.id) }}" style="display:inline"
+                onsubmit="return confirm('Delete this role?')">
+            <button type="submit" class="btn-xs danger">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="empty-icon">📋</span>
+  <h3>No job descriptions yet</h3>
+  <p>Add roles for students to be matched against.</p>
+  <a href="{{ url_for('admin.add_jd') }}" class="btn-primary">Add your first role →</a>
+</div>
+{% endif %}
+
+<!-- ── Placed students ───────────────────────────────────── -->
+{% if placements %}
+<div class="section-header mt">
+  <h2>Placed Students</h2>
+  <a href="{{ url_for('placement.results') }}" class="btn-ghost">View all batches →</a>
+</div>
+<div class="table-card">
+  <table class="data-table">
+    <thead>
+      <tr><th>Student</th><th>University</th><th>Role</th><th>Score</th><th>Date</th></tr>
+    </thead>
+    <tbody>
+      {% for p in placements %}
+      <tr>
+        <td>
+          <strong>{{ p.student.name if p.student else "—" }}</strong>
+          {% if p.student %}<br/><small class="muted">{{ p.student.department }}</small>{% endif %}
+        </td>
+        <td>{{ p.student.university if p.student else "—" }}</td>
+        <td>{{ p.job_description.title if p.job_description else "—" }}</td>
+        <td>
+          <span class="score-pill {% if p.match_score >= 0.75 %}high{% elif p.match_score >= 0.5 %}mid{% else %}low{% endif %}">
+            {{ "%.1f"|format(p.match_score * 100) }}%
+          </span>
+        </td>
+        <td><small>{{ p.created_at.strftime('%d %b %Y') }}</small></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ── Run placement ─────────────────────────────────────── -->
+{% if current_user.role == "admin" %}
+<div class="card mt" x-data="{ running: false }">
+  <h3>⚡ Run Placement Algorithm</h3>
+  <p class="muted">Triggers SBERT encoding → cosine similarity → Gale-Shapley matching for all eligible students. Quotas are automatically decremented after each run.</p>
+  <form method="POST" action="{{ url_for('admin.run_placement') }}"
+        @submit="running = true" x-bind:class="running ? 'submitting' : ''">
+    <div class="inline-form mt">
+      <input type="text" name="label" class="flex-input"
+             placeholder="Batch label e.g. 2024/2025 Semester 1"
+             value="2024/2025 SIWES Placement"/>
+      <button type="submit" class="btn-primary" :disabled="running">
+        <span x-show="!running">Run Placement</span>
+        <span x-show="running" style="display:none">
+          <span class="spinner"></span> Running…
+        </span>
+      </button>
+    </div>
+  </form>
+  {% if recent_batch %}
+  <p class="muted mt-sm" style="font-size:.8rem">
+    Last run: <strong>{{ recent_batch.label }}</strong> —
+    {{ recent_batch.placed_students }}/{{ recent_batch.total_students }} students placed
+    on {{ recent_batch.run_at.strftime('%d %b %Y at %H:%M') }}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

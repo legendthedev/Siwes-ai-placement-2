@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}School Admin Dashboard — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ school.name }}</h1>
+  <p>{{ school.location }} · {{ school.state }} · Tech School Admin</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <span class="stat-num">{{ school.courses|length }}</span>
+    <span class="stat-label">Courses</span>
+  </div>
+  <div class="stat-card accent">
+    <span class="stat-num">{{ pending|length }}</span>
+    <span class="stat-label">Pending Payment</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ paid|length }}</span>
+    <span class="stat-label">Payment Received</span>
+  </div>
+  <div class="stat-card verified">
+    <span class="stat-num">{{ enrolled|length }}</span>
+    <span class="stat-label">Fully Enrolled</span>
+  </div>
+</div>
+
+<!-- Per-course stats -->
+{% if course_stats %}
+<div class="section-header">
+  <h2>Course Breakdown</h2>
+</div>
+<div class="dash-grid">
+  {% for cid, cs in course_stats.items() %}
+  <div class="card">
+    <h3>{{ cs.name }}</h3>
+    <table class="info-table">
+      <tr><td>Pending</td><td><span class="badge-warn">{{ cs.pending }}</span></td></tr>
+      <tr><td>Paid</td><td><span class="badge-ok">{{ cs.paid }}</span></td></tr>
+      <tr><td>Enrolled</td><td><span class="badge-ok">{{ cs.enrolled }}</span></td></tr>
+      <tr><td>Total</td><td><strong>{{ cs.total }}</strong></td></tr>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Enrollments table -->
+<div class="section-header mt">
+  <h2>All Enrollments</h2>
+</div>
+
+{% if enrollments %}
+<div class="table-card" x-data="{ filter: 'all', query: '' }">
+  <div class="table-toolbar">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      {% for f, label in [("all","All"), ("pending_payment","Pending"), ("paid","Paid"), ("enrolled","Enrolled")] %}
+      <button class="filter-btn" :class="{ active: filter==='{{ f }}' }"
+              @click="filter='{{ f }}'" type="button">{{ label }}</button>
+      {% endfor %}
+    </div>
+    <input class="table-search" type="text" x-model="query" placeholder="Search student…"/>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr><th>Student</th><th>University</th><th>Course</th><th>Test Score</th>
+          <th>SIWES Fee</th><th>Status</th><th>Submitted</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {% for e in enrollments %}
+      <tr x-show="(filter==='all' || filter==='{{ e.status }}') &&
+                  (!query || '{{ e.student.name }} {{ e.student.university }}'.toLowerCase().includes(query.toLowerCase()))">
+        <td>
+          <strong>{{ e.student.name if e.student else "—" }}</strong>
+          {% if e.student %}<br/><small class="muted">{{ e.student.email }}</small>{% endif %}
+        </td>
+        <td>{{ e.student.university if e.student else "—" }}</td>
+        <td>{{ e.course.name if e.course else "—" }}</td>
+        <td>
+          <span class="score-pill {% if e.test_score >= 75 %}high{% elif e.test_score >= 60 %}mid{% else %}low{% endif %}">
+            {{ e.test_score|int }}%
+          </span>
+        </td>
+        <td style="color:var(--green);font-weight:600">₦{{ "{:,}".format(e.amount_ngn or 0) }}</td>
+        <td>
+          <span class="score-pill {% if e.status == 'enrolled' %}high{% elif e.status == 'paid' %}mid{% elif e.status == 'rejected' %}low{% else %}{% endif %}"
+                style="{% if e.status == 'pending_payment' %}background:var(--amber-dim);border:1px solid var(--amber);color:#fde68a{% endif %}">
+            {{ e.status.replace("_", " ").title() }}
+          </span>
+        </td>
+        <td><small>{{ e.enrolled_at.strftime("%d %b %Y") }}</small></td>
+        <td>
+          <form method="POST" action="{{ url_for('schools.confirm_enrollment', enrollment_id=e.id) }}"
+                style="display:flex;gap:.3rem">
+            {% if e.status == "pending_payment" %}
+              <button name="new_status" value="paid"     class="btn-xs success">Mark Paid</button>
+              <button name="new_status" value="rejected" class="btn-xs danger"
+                      onclick="return confirm('Reject this enrollment?')">Reject</button>
+            {% elif e.status == "paid" %}
+              <button name="new_status" value="enrolled" class="btn-xs success">Confirm Enrolled</button>
+            {% else %}
+              <span class="muted" style="font-size:.78rem">—</span>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="empty-icon">📭</span>
+  <h3>No enrollments yet</h3>
+  <p>Students who pass your preliminary tests and submit enrollment requests will appear here.</p>
+</div>
+{% endif %}
+
+<!-- School info -->
+<div class="card mt">
+  <h3>School Information</h3>
+  <table class="info-table">
+    <tr><td>Name</td><td>{{ school.name }}</td></tr>
+    <tr><td>Location</td><td>{{ school.location }}</td></tr>
+    <tr><td>State</td><td>{{ school.state }}</td></tr>
+    <tr><td>SIWES Discount</td><td><strong>{{ school.siwes_discount_pct }}%</strong></td></tr>
+    <tr><td>Discount Note</td><td>{{ school.siwes_discount_note }}</td></tr>
+    {% if school.website %}
+    <tr><td>Website</td><td><a href="{{ school.website }}" target="_blank" class="company-link">{{ school.website }}</a></td></tr>
+    {% endif %}
+  </table>
+</div>
+{% endblock %}

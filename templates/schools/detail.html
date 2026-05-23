@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ school.name }} — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ school.name }}</h1>
+  <p>📍 {{ school.location }} · {{ school.state }}</p>
+</div>
+<div class="dash-grid">
+  <div class="card" style="grid-column:1/-1">
+    <p>{{ school.description }}</p>
+    {% if school.siwes_discount_pct %}
+    <div class="discount-banner mt">
+      🎓 <strong>SIWES Students Save {{ school.siwes_discount_pct }}%</strong> — {{ school.siwes_discount_note }}
+    </div>
+    {% endif %}
+    {% if school.website %}<a href="{{ school.website }}" target="_blank" class="btn-outline mt">Visit website ↗</a>{% endif %}
+  </div>
+  {% for course in school.courses %}
+  <div class="card">
+    <h3>{{ course.name }}</h3>
+    <table class="info-table">
+      <tr><td>Duration</td><td>{{ course.duration_months }} months</td></tr>
+      <tr><td>Full fee</td><td>₦{{ "{:,}".format(course.price_ngn) }}</td></tr>
+      {% if course.siwes_price_ngn and course.siwes_price_ngn != course.price_ngn %}
+      <tr><td>SIWES fee</td><td style="color:var(--green);font-weight:700">₦{{ "{:,}".format(course.siwes_price_ngn) }} ({{ course.discount_pct }}% off)</td></tr>
+      {% endif %}
+    </table>
+    <div class="skill-tags mt">
+      {% for s in course.get_skills() %}<span class="tag">{{ s }}</span>{% endfor %}
+    </div>
+    <p class="muted mt-sm" style="font-size:.82rem">{{ course.description }}</p>
+    <a href="{{ url_for('schools.take_test', course_id=course.id) }}" class="btn-primary mt">Take preliminary test →</a>
+  </div>
+  {% endfor %}
+</div>
+<a href="{{ url_for('schools.listing') }}" class="btn-ghost mt">← Back to all schools</a>
+<style>
+.discount-banner { background:#071d11; border:1px solid var(--green); border-radius:7px; padding:.7rem .9rem; font-size:.85rem; color:#bbf7d0; }
+</style>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Test Result — {{ course.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Test Result</h1>
+  <p>{{ course.name }} · {{ course.school.name }}</p>
+</div>
+
+<div class="result-hero">
+  <div class="result-company">
+    <span class="result-icon">{{ "🎉" if attempt.passed else "📚" }}</span>
+    <div>
+      <h2>{{ "Congratulations — You Passed!" if attempt.passed else "Not Passed — Review & Retry" }}</h2>
+      <p>Score: <strong>{{ attempt.score }}%</strong> · Pass mark: <strong>{{ pass_mark|int }}%</strong></p>
+    </div>
+  </div>
+  <div class="score-circle {{ "high" if attempt.passed else "low" }}">
+    <span>{{ attempt.score|int }}%</span>
+    <small>{{ "PASS" if attempt.passed else "FAIL" }}</small>
+  </div>
+</div>
+
+{% if attempt.passed %}
+  <!-- ── PASSED — show enroll button or already-enrolled notice ──────────── -->
+  {% if already_enrolled %}
+  <div class="info-box mb">
+    ✅ You are already enrolled in this course.
+    <a href="{{ url_for('schools.enrollment_status', enrollment_id=already_enrolled.id) }}"
+       class="btn-ghost" style="margin-left:.8rem">View enrollment status →</a>
+  </div>
+  {% elif current_user.is_authenticated and current_user.role == "student" %}
+  <div class="card mb" style="border-color:var(--green);background:linear-gradient(135deg,var(--surface),var(--green-dim))">
+    <h3>🚀 You're eligible to register!</h3>
+    <p>You passed the preliminary test for <strong>{{ course.name }}</strong>.
+       Register now to claim your SIWES discount of <strong>{{ course.discount_pct }}%</strong>.</p>
+    <table class="info-table mt">
+      <tr><td>Standard fee</td>
+          <td style="text-decoration:line-through;color:var(--muted)">₦{{ "{:,}".format(course.price_ngn) }}</td></tr>
+      <tr><td><strong>SIWES fee</strong></td>
+          <td><strong style="color:var(--green);font-size:1.1rem">
+            ₦{{ "{:,}".format(course.siwes_price_ngn or course.price_ngn) }}
+          </strong></td></tr>
+    </table>
+    <a href="{{ url_for('schools.enroll', course_id=course.id, attempt_id=attempt.id) }}"
+       class="btn-primary mt">Register for {{ course.name }} →</a>
+  </div>
+  {% endif %}
+
+{% else %}
+  <!-- ── FAILED — locked out, show answer review ─────────────────────────── -->
+  <div class="card mb" style="border-color:var(--red);background:linear-gradient(135deg,var(--surface),var(--red-dim))">
+    <h3>❌ Registration Locked</h3>
+    <p>You need <strong>{{ pass_mark|int }}%</strong> to unlock registration for this course.
+       Review your answers below, then retake the test when ready.</p>
+    <a href="{{ url_for('schools.take_test', course_id=course.id) }}"
+       class="btn-outline mt" style="border-color:var(--amber);color:var(--amber)">
+      🔄 Retake Test
+    </a>
+  </div>
+{% endif %}
+
+<!-- Answer review -->
+<div class="card mt">
+  <h3>Answer Review</h3>
+  {% for q in questions %}
+  {% set chosen = answers.get(q.id|string, "") %}
+  {% set correct = chosen == q.correct_answer %}
+  <div class="review-row {{ "correct" if correct else "wrong" }}">
+    <p class="q-text"><strong>{{ loop.index }}.</strong> {{ q.question }}</p>
+    <p style="font-size:.85rem;margin-top:.3rem">
+      Your answer: <strong>{{ chosen or "— not answered —" }}</strong>
+      {% if not correct %}
+        · Correct: <strong style="color:var(--green)">{{ q.correct_answer }}</strong>
+      {% else %}
+        <span style="color:var(--green)"> ✓</span>
+      {% endif %}
+    </p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="actions mt">
+  {% if not attempt.passed %}
+  <a href="{{ url_for('schools.take_test', course_id=course.id) }}" class="btn-primary">🔄 Retake Test</a>
+  {% endif %}
+  <a href="{{ url_for('schools.detail', school_id=course.school_id) }}" class="btn-ghost">← Back to school</a>
+  <a href="{{ url_for('schools.listing') }}" class="btn-ghost">Browse schools</a>
+</div>
+{% endblock %}

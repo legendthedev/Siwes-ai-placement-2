@@ -1,0 +1,552 @@
+{% extends "base.html" %}
+{% block title %}Evaluation Metrics — SIWES Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📊 Model Evaluation Metrics</h1>
+  <p>Full algorithmic performance report — SBERT · Gale-Shapley · SHAP</p>
+</div>
+
+<!-- Batch selector -->
+{% if batches %}
+<form method="GET" class="inline-form mb">
+  <label style="color:var(--text2);font-size:.85rem">Select batch:</label>
+  <select name="batch_id" class="flex-input" onchange="this.form.submit()" style="max-width:400px">
+    {% for b in batches %}
+      <option value="{{ b.id }}" {% if b.id == selected_batch %}selected{% endif %}>
+        {{ b.label }} — {{ b.placed_students }}/{{ b.total_students }} placed
+        ({{ b.run_at.strftime('%d %b %Y') }})
+      </option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
+{% if not metrics %}
+<div class="empty-state">
+  <span class="empty-icon">📊</span>
+  <h3>No evaluation data yet</h3>
+  <p>Run the placement algorithm first to generate metrics.</p>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn-primary">Go to Dashboard →</a>
+</div>
+
+{% else %}
+
+<!-- ══════════════════════════════════════════════
+     HEADLINE KPIs
+═══════════════════════════════════════════════ -->
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card {% if metrics.match_rate >= 0.8 %}verified{% else %}accent{% endif %}">
+    <span class="stat-num">{{ "%.0f"|format(metrics.match_rate * 100) }}%</span>
+    <span class="stat-label">Match Rate</span>
+    <span class="stat-trend">{{ metrics.n_matched }}/{{ metrics.n_total }} students</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ "%.3f"|format(metrics.mean_score) }}</span>
+    <span class="stat-label">Mean Cosine Score</span>
+  </div>
+  <div class="stat-card {% if metrics.is_stable %}verified{% endif %}">
+    <span class="stat-num">{{ "✅" if metrics.is_stable else "❌" }}</span>
+    <span class="stat-label">GS Stable ({{ metrics.blocking_pairs }} blocking pairs)</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ "%.3f"|format(metrics.mrr) }}</span>
+    <span class="stat-label">MRR (ranking quality)</span>
+  </div>
+</div>
+
+<!-- Tabs navigation -->
+<div class="eval-tabs" x-data="{ tab: 'coverage' }">
+  <div class="tab-nav">
+    {% for t, label in [
+      ("coverage",  "📈 Coverage"),
+      ("stability", "⚖️ Stability"),
+      ("alignment", "🎯 Skill Alignment"),
+      ("fairness",  "🏛 Fairness"),
+      ("quota",     "🏢 Quota"),
+      ("ranking",   "📐 Ranking Quality"),
+      ("report",    "📋 Full Report"),
+    ] %}
+    <button class="tab-btn" :class="{ active: tab === '{{ t }}' }"
+            @click="tab = '{{ t }}'">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 1 — COVERAGE & QUALITY
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'coverage'" x-transition>
+    <div class="dash-grid">
+
+      <div class="card">
+        <h3>Coverage Summary</h3>
+        <table class="info-table">
+          <tr><td>Students eligible</td><td><strong>{{ metrics.n_total }}</strong></td></tr>
+          <tr><td>Students placed</td><td><strong>{{ metrics.n_matched }}</strong></td></tr>
+          <tr><td>Unmatched</td><td><strong>{{ metrics.unmatched }}</strong></td></tr>
+          <tr><td>Match rate</td><td><strong>{{ "%.2f"|format(metrics.match_rate * 100) }}%</strong></td></tr>
+        </table>
+        <!-- Coverage bar -->
+        <div style="background:var(--border);border-radius:4px;height:10px;margin-top:1rem;overflow:hidden">
+          <div style="width:{{ "%.1f"|format(metrics.match_rate * 100) }}%;height:100%;
+                      background:{% if metrics.match_rate >= 0.8 %}var(--green){% elif metrics.match_rate >= 0.6 %}var(--amber){% else %}var(--red){% endif %};
+                      transition:width .8s"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Score Distribution</h3>
+        <table class="info-table">
+          <tr><td>Mean</td><td><strong>{{ metrics.mean_score }}</strong></td></tr>
+          <tr><td>Median</td><td><strong>{{ metrics.median_score }}</strong></td></tr>
+          <tr><td>Std dev</td><td>{{ metrics.std_score }}</td></tr>
+          <tr><td>Min</td><td>{{ metrics.min_score }}</td></tr>
+          <tr><td>Max</td><td>{{ metrics.max_score }}</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Score Bands</h3>
+        {% for label, count, col in [
+            ("Strong (≥ 0.75)", metrics.strong,   "green"),
+            ("Moderate (0.50–0.75)", metrics.moderate, "amber"),
+            ("Weak (< 0.50)", metrics.weak,     "red"),
+        ] %}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+          <span style="font-size:.85rem">{{ label }}</span>
+          <span class="score-pill {{ col }}" style="margin-left:.5rem">{{ count }}</span>
+        </div>
+        <div style="background:var(--border);border-radius:3px;height:6px;margin-bottom:.6rem;overflow:hidden">
+          <div style="width:{% if metrics.n_matched %}{{ (count/metrics.n_matched*100)|int }}{% else %}0{% endif %}%;
+                      height:100%;background:var(--{{ col }})"></div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <h3>Percentiles</h3>
+        <table class="info-table">
+          {% for pct, val in metrics.percentiles.items() %}
+          <tr><td>P{{ pct }}</td><td><strong>{{ val }}</strong></td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+
+    <!-- Score histogram -->
+    <div class="card mt">
+      <h3>Score Histogram</h3>
+      <div class="histogram-wrap">
+        {% set max_count = metrics.score_hist|map(attribute='count')|max %}
+        {% for bar in metrics.score_hist %}
+        {% set ht = (bar.count / max_count * 160)|int if max_count else 0 %}
+        <div class="hist-col" data-tooltip="{{ bar.count }} students">
+          <div class="hist-bar" style="height:{{ ht }}px"></div>
+          <span class="hist-label">{{ bar.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 2 — STABILITY
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'stability'" x-transition style="display:none">
+    <div class="dash-grid">
+      <div class="card {% if metrics.is_stable %}verified{% endif %}">
+        <h3>Gale-Shapley Stability</h3>
+        <div style="text-align:center;padding:1rem 0">
+          <div style="font-size:3rem">{{ "✅" if metrics.is_stable else "❌" }}</div>
+          <p style="margin-top:.5rem;font-weight:600">
+            {{ "Stable matching confirmed" if metrics.is_stable else "Instability detected" }}
+          </p>
+          <p class="muted">{{ metrics.blocking_pairs }} blocking pair(s) found</p>
+        </div>
+        <div class="info-box">
+          A <strong>blocking pair</strong> (s, c) exists when student s prefers company c over their current match, and c would also prefer s over one of its current students. Zero blocking pairs = provably stable allocation.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Student Preference Satisfaction</h3>
+        <table class="info-table">
+          <tr><td>Avg preference rank</td><td><strong>{{ metrics.mean_rank }}</strong> <span class="muted">(1 = top choice)</span></td></tr>
+          <tr><td>Got top-1 choice</td><td><strong>{{ "%.1f"|format(metrics.top1_rate * 100) }}%</strong> of students</td></tr>
+          <tr><td>Got top-3 choice</td><td><strong>{{ "%.1f"|format(metrics.top3_rate * 100) }}%</strong> of students</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mt">
+      <h3>Preference Rank Distribution</h3>
+      <div class="histogram-wrap">
+        {% set max_rc = metrics.rank_chart|map(attribute='count')|max %}
+        {% for r in metrics.rank_chart %}
+        {% set ht = (r.count / max_rc * 160)|int if max_rc else 0 %}
+        <div class="hist-col" data-tooltip="Rank {{ r.rank }}: {{ r.count }} students">
+          <div class="hist-bar" style="height:{{ ht }}px;background:{% if r.rank==1 %}var(--green){% elif r.rank<=3 %}var(--accent){% else %}var(--amber){% endif %}"></div>
+          <span class="hist-label">R{{ r.rank }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="muted" style="font-size:.8rem;margin-top:.5rem">
+        R1 = student got their #1 preferred company. Lower ranks are better.
+      </p>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 3 — SKILL ALIGNMENT
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'alignment'" x-transition style="display:none">
+    <div class="dash-grid">
+      <div class="card">
+        <h3>Mean Precision</h3>
+        <div class="big-metric">{{ metrics.mean_precision }}</div>
+        <p class="muted">Fraction of student skills that are required by their matched JD</p>
+        <div class="metric-bar-wrap">
+          <div class="metric-bar" style="width:{{ (metrics.mean_precision * 100)|int }}%"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mean Recall</h3>
+        <div class="big-metric">{{ metrics.mean_recall }}</div>
+        <p class="muted">Fraction of JD-required skills covered by the student's CV</p>
+        <div class="metric-bar-wrap">
+          <div class="metric-bar" style="width:{{ (metrics.mean_recall * 100)|int }}%"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mean F1 Score</h3>
+        <div class="big-metric {% if metrics.mean_f1 >= 0.6 %}green{% elif metrics.mean_f1 >= 0.4 %}amber{% else %}red{% endif %}">{{ metrics.mean_f1 }}</div>
+        <p class="muted">Harmonic mean of precision and recall — primary skill alignment metric</p>
+        <div class="metric-bar-wrap">
+          <div class="metric-bar" style="width:{{ (metrics.mean_f1 * 100)|int }}%;background:{% if metrics.mean_f1 >= 0.6 %}var(--green){% elif metrics.mean_f1 >= 0.4 %}var(--amber){% else %}var(--red){% endif %}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card mt" x-data="{ query: '' }">
+      <div class="table-toolbar">
+        <h3 style="margin:0">Per-Placement Skill Alignment</h3>
+        <input class="table-search" type="text" x-model="query" placeholder="Search student or company…"/>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Student</th><th>Company</th><th>Role</th><th>Precision</th><th>Recall</th><th>F1</th><th>Score</th></tr></thead>
+        <tbody>
+          {% for r in metrics.alignment_rows %}
+          <tr x-show="!query || '{{ r.student }} {{ r.company }} {{ r.role }}'.toLowerCase().includes(query.toLowerCase())">
+            <td>{{ r.student }}</td>
+            <td>{{ r.company }}</td>
+            <td>{{ r.role }}</td>
+            <td>{{ r.precision }}</td>
+            <td>{{ r.recall }}</td>
+            <td><span class="score-pill {% if r.f1 >= 0.6 %}high{% elif r.f1 >= 0.4 %}mid{% else %}low{% endif %}">{{ r.f1 }}</span></td>
+            <td><span class="score-pill {% if r.score >= 0.75 %}high{% elif r.score >= 0.5 %}mid{% else %}low{% endif %}">{{ "%.3f"|format(r.score) }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 4 — FAIRNESS
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'fairness'" x-transition style="display:none">
+    <div class="dash-grid">
+      <div class="card">
+        <h3>Gini Coefficient</h3>
+        <div class="big-metric {% if metrics.gini <= 0.2 %}green{% elif metrics.gini <= 0.4 %}amber{% else %}red{% endif %}">
+          {{ metrics.gini }}
+        </div>
+        <p class="muted">0 = perfect equality of match scores · 1 = maximum concentration</p>
+        <div class="info-box mt">
+          {{ "✅ Low inequality — match scores are distributed fairly across students." if metrics.gini <= 0.2
+          else "⚠️ Moderate inequality — some student groups may have systematically lower match scores." if metrics.gini <= 0.4
+          else "❌ High inequality — review skill taxonomy coverage for underrepresented departments." }}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Coefficient of Variation</h3>
+        <div class="big-metric">{{ metrics.cv }}</div>
+        <p class="muted">Std dev ÷ mean. Lower = more consistent match quality.</p>
+      </div>
+    </div>
+
+    <div class="dash-grid mt">
+      <div class="card">
+        <h3>Coverage by Department</h3>
+        {% for r in metrics.dept_rows %}
+        <div style="margin-bottom:.8rem">
+          <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.25rem">
+            <span>{{ r.dept }}</span>
+            <span>{{ r.matched }}/{{ r.total }}
+              <span class="score-pill {% if r.rate >= 0.75 %}high{% elif r.rate >= 0.5 %}mid{% else %}low{% endif %}" style="font-size:.72rem">{{ "%.0f"|format(r.rate*100) }}%</span>
+            </span>
+          </div>
+          <div style="background:var(--border);border-radius:3px;height:6px;overflow:hidden">
+            <div style="width:{{ (r.rate*100)|int }}%;height:100%;background:var(--accent)"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <h3>Coverage by State</h3>
+        {% for r in metrics.state_rows %}
+        <div style="margin-bottom:.8rem">
+          <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.25rem">
+            <span>{{ r.state }}</span>
+            <span>{{ r.matched }}/{{ r.total }}
+              <span class="score-pill {% if r.rate >= 0.75 %}high{% elif r.rate >= 0.5 %}mid{% else %}low{% endif %}" style="font-size:.72rem">{{ "%.0f"|format(r.rate*100) }}%</span>
+            </span>
+          </div>
+          <div style="background:var(--border);border-radius:3px;height:6px;overflow:hidden">
+            <div style="width:{{ (r.rate*100)|int }}%;height:100%;background:var(--accent2)"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 5 — QUOTA UTILISATION
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'quota'" x-transition style="display:none">
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.total_quota }}</span>
+        <span class="stat-label">Total Capacity</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.filled_quota }}</span>
+        <span class="stat-label">Positions Filled</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.total_quota - metrics.filled_quota }}</span>
+        <span class="stat-label">Slots Remaining</span>
+      </div>
+      <div class="stat-card {% if metrics.overall_util >= 0.8 %}verified{% endif %}">
+        <span class="stat-num">{{ "%.0f"|format(metrics.overall_util * 100) }}%</span>
+        <span class="stat-label">Overall Utilisation</span>
+      </div>
+    </div>
+
+    <div class="table-card mt" x-data="{ query: '' }">
+      <div class="table-toolbar">
+        <h3 style="margin:0">Per-Role Quota Utilisation</h3>
+        <input class="table-search" type="text" x-model="query" placeholder="Filter roles…"/>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Company</th><th>Role</th><th>Quota</th><th>Placed</th><th>Remaining</th><th>Fill</th></tr></thead>
+        <tbody>
+          {% for r in metrics.quota_rows %}
+          <tr x-show="!query || '{{ r.company }} {{ r.title }}'.toLowerCase().includes(query.toLowerCase())">
+            <td>{{ r.company }}</td>
+            <td>{{ r.title }}</td>
+            <td>{{ r.quota }}</td>
+            <td>{{ r.placed }}</td>
+            <td>
+              <span class="badge-{% if r.remaining == 0 %}warn{% else %}ok{% endif %}">
+                {{ r.remaining }}
+              </span>
+            </td>
+            <td>
+              <div style="display:flex;align-items:center;gap:.5rem;min-width:100px">
+                <div style="flex:1;background:var(--border);border-radius:3px;height:6px">
+                  <div style="width:{{ r.fill_pct|int }}%;height:100%;border-radius:3px;
+                              background:{% if r.fill_pct==100 %}var(--green){% elif r.fill_pct>=50 %}var(--accent){% else %}var(--amber){% endif %}"></div>
+                </div>
+                <span style="font-size:.75rem;color:var(--muted)">{{ r.fill_pct }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 6 — RANKING QUALITY
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'ranking'" x-transition style="display:none">
+    <div class="info-box mb">
+      These metrics evaluate how well the <strong>SBERT cosine similarity ranking</strong> (input to Gale-Shapley) orders the companies for each student. The matched company is treated as the single relevant document per student.
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card {% if metrics.mrr >= 0.7 %}verified{% elif metrics.mrr >= 0.4 %}accent{% endif %}">
+        <span class="stat-num">{{ metrics.mrr }}</span>
+        <span class="stat-label">MRR — Mean Reciprocal Rank</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.mAP }}</span>
+        <span class="stat-label">MAP — Mean Avg Precision</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.ndcg[1] }}</span>
+        <span class="stat-label">NDCG@1</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">{{ metrics.ndcg[5] }}</span>
+        <span class="stat-label">NDCG@5</span>
+      </div>
+    </div>
+
+    <div class="dash-grid mt">
+      <div class="card">
+        <h3>NDCG at different k</h3>
+        {% for k in [1, 3, 5, 10] %}
+        {% set val = metrics.ndcg[k] %}
+        <div style="margin-bottom:.8rem">
+          <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.2rem">
+            <span>NDCG@{{ k }}</span><span><strong>{{ val }}</strong></span>
+          </div>
+          <div style="background:var(--border);border-radius:3px;height:8px;overflow:hidden">
+            <div style="width:{{ (val*100)|int }}%;height:100%;
+                        background:{% if val>=0.7 %}var(--green){% elif val>=0.4 %}var(--accent){% else %}var(--amber){% endif %}"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <h3>Hit Rate @ k</h3>
+        {% for k, val in metrics.hit_rates.items() %}
+        <div style="margin-bottom:.8rem">
+          <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.2rem">
+            <span>Hit@{{ k }}</span>
+            <span><strong>{{ "%.1f"|format(val*100) }}%</strong> of students</span>
+          </div>
+          <div style="background:var(--border);border-radius:3px;height:8px;overflow:hidden">
+            <div style="width:{{ (val*100)|int }}%;height:100%;background:var(--accent2)"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <h3>Interpretation</h3>
+        <table class="info-table">
+          <tr><td>MRR {{ metrics.mrr }}</td>
+            <td>{{ "Strong — SBERT ranks well" if metrics.mrr >= 0.7 else "Moderate — consider retraining spaCy NER" if metrics.mrr >= 0.4 else "Weak — review skill taxonomy" }}</td></tr>
+          <tr><td>MAP {{ metrics.mAP }}</td><td>Mean average precision across all students</td></tr>
+          <tr><td>Blocking pairs</td><td>{{ metrics.blocking_pairs }} ({{ "✅ Stable" if metrics.blocking_pairs == 0 else "❌ Check GS implementation" }})</td></tr>
+          <tr><td>Mean rank</td><td>{{ metrics.mean_rank }} (1 = perfect)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════════════
+     TAB 7 — FULL REPORT TABLE
+═══════════════════════════════════════════════ -->
+  <div class="tab-panel" x-show="tab === 'report'" x-transition style="display:none">
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3 style="margin:0">Complete Evaluation Report — Batch {{ selected_batch }}</h3>
+        <a href="{{ url_for('placement.export_csv', batch_id=selected_batch) }}"
+           class="btn-outline">⬇ Export CSV</a>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Category</th><th>Metric</th><th>Value</th><th>Interpretation</th></tr></thead>
+        <tbody>
+          {% for row in [
+            ("Coverage","Match Rate",      "%.2f%%"|format(metrics.match_rate*100), "% students placed"),
+            ("Coverage","Students Matched", metrics.n_matched|string, "absolute count"),
+            ("Coverage","Total Students",  metrics.n_total|string, "absolute count"),
+            ("Quality", "Mean Score",      metrics.mean_score|string, "higher = stronger match"),
+            ("Quality", "Median Score",    metrics.median_score|string, "50th percentile"),
+            ("Quality", "Std Dev",         metrics.std_score|string, "lower = more consistent"),
+            ("Quality", "Strong Matches",  metrics.strong|string, "score ≥ 0.75"),
+            ("Quality", "Moderate Matches",metrics.moderate|string, "0.50–0.75"),
+            ("Quality", "Weak Matches",    metrics.weak|string, "score < 0.50"),
+            ("Stability","Blocking Pairs", metrics.blocking_pairs|string, "0 = stable"),
+            ("Stability","Algorithm Stable",("YES" if metrics.is_stable else "NO"), "GS guarantee"),
+            ("Stability","Mean Pref Rank", metrics.mean_rank|string, "1 = top choice"),
+            ("Stability","Top-1 Rate",     "%.1f%%"|format(metrics.top1_rate*100), "got #1 choice"),
+            ("Stability","Top-3 Rate",     "%.1f%%"|format(metrics.top3_rate*100), "got top-3"),
+            ("Skill","Mean Precision",     metrics.mean_precision|string, "CV relevance to JD"),
+            ("Skill","Mean Recall",        metrics.mean_recall|string, "JD coverage"),
+            ("Skill","Mean F1",            metrics.mean_f1|string, "harmonic P/R"),
+            ("Fairness","Gini Coefficient",metrics.gini|string, "0=equal, 1=unequal"),
+            ("Fairness","Coeff. Variation",metrics.cv|string, "lower=consistent"),
+            ("Quota","Total Quota",        metrics.total_quota|string, "all available slots"),
+            ("Quota","Filled Quota",       metrics.filled_quota|string, "slots used"),
+            ("Quota","Overall Util.",      "%.1f%%"|format(metrics.overall_util*100), "filled ÷ total"),
+            ("Ranking","MRR",              metrics.mrr|string, "mean reciprocal rank"),
+            ("Ranking","MAP",              metrics.mAP|string, "mean avg precision"),
+            ("Ranking","NDCG@1",           metrics.ndcg[1]|string, "perfect=1.0"),
+            ("Ranking","NDCG@3",           metrics.ndcg[3]|string, "top-3 quality"),
+            ("Ranking","NDCG@5",           metrics.ndcg[5]|string, "top-5 quality"),
+            ("Ranking","Hit@1",            "%.1f%%"|format(metrics.hit_rates[1]*100), "match at rank 1"),
+          ] %}
+          <tr>
+            <td><span class="tag sm">{{ row[0] }}</span></td>
+            <td>{{ row[1] }}</td>
+            <td><strong>{{ row[2] }}</strong></td>
+            <td class="muted" style="font-size:.8rem">{{ row[3] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div> <!-- /eval-tabs -->
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.eval-tabs { margin-top: 1.5rem; }
+.tab-nav {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; padding-bottom: .6rem;
+}
+.tab-btn {
+  padding: .45rem 1rem; border-radius: 7px; border: 1px solid var(--border);
+  background: transparent; color: var(--text2); font-size: .82rem; font-weight: 500;
+  cursor: pointer; transition: all .18s;
+}
+.tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab-btn:hover:not(.active) { background: var(--surface2); color: var(--text); }
+.tab-panel { animation: fadeIn .2s ease; }
+
+.big-metric {
+  font-size: 2.8rem; font-weight: 800; letter-spacing: -1px;
+  color: var(--accent); margin: .5rem 0;
+}
+.big-metric.green  { color: var(--green); }
+.big-metric.amber  { color: var(--amber); }
+.big-metric.red    { color: var(--red); }
+
+.metric-bar-wrap {
+  background: var(--border); border-radius: 4px; height: 8px;
+  margin-top: .8rem; overflow: hidden;
+}
+.metric-bar {
+  height: 100%; background: var(--accent); border-radius: 4px; transition: width .8s;
+}
+
+.histogram-wrap {
+  display: flex; align-items: flex-end; gap: .3rem;
+  height: 180px; padding: 1rem 0 .5rem; overflow-x: auto;
+}
+.hist-col {
+  display: flex; flex-direction: column; align-items: center;
+  gap: .3rem; flex-shrink: 0; min-width: 44px;
+}
+.hist-bar {
+  width: 30px; background: var(--accent); border-radius: 4px 4px 0 0;
+  min-height: 2px; transition: height .6s;
+}
+.hist-label { font-size: .64rem; color: var(--muted); writing-mode: vertical-lr;
+              transform: rotate(180deg); white-space: nowrap; }
+</style>
+{% endblock %}

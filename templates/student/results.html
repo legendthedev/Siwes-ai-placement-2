@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Placement Results — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Placement Results</h1>
+  <p>Gale-Shapley stable matching output</p>
+</div>
+
+{% if batches %}
+<form method="GET" class="inline-form mb">
+  <select name="batch_id" onchange="this.form.submit()">
+    {% for b in batches %}
+      <option value="{{ b.id }}" {% if b.id == selected_batch %}selected{% endif %}>
+        {{ b.label }} — {{ b.placed_students }}/{{ b.total_students }} placed ({{ b.run_at.strftime('%d %b %Y') }})
+      </option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
+{% if rows %}
+<div class="table-card">
+  <table class="data-table">
+    <thead>
+      <tr><th>Student</th><th>Department</th><th>Company</th><th>Role</th><th>Location</th><th>Score</th></tr>
+    </thead>
+    <tbody>
+    {% for p, s, c, jd in rows %}
+    <tr>
+      <td><strong>{{ s.name }}</strong></td>
+      <td>{{ s.department }}</td>
+      <td>{{ c.name }}</td>
+      <td>{{ jd.title }}</td>
+      <td>{{ c.location }}</td>
+      <td><span class="score-pill {% if p.match_score >= 0.75 %}high{% elif p.match_score >= 0.5 %}mid{% else %}low{% endif %}">
+        {{ "%.1f"|format(p.match_score * 100) }}%
+      </span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>No placement results yet. Run the algorithm from the admin dashboard.</p>
+</div>
+{% endif %}
+{% endblock %}

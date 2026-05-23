@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Tech Schools — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Tech Schools</h1>
+  <p>Paid training programmes in Lagos, Abuja, Ibadan, Calabar & Kwara — with SIWES student discounts</p>
+</div>
+
+<!-- State filter -->
+<div class="filter-bar">
+  <a href="{{ url_for('schools.listing') }}"
+     class="filter-btn {% if not selected_state %}active{% endif %}">All States</a>
+  {% for s in states %}
+  <a href="{{ url_for('schools.listing', state=s) }}"
+     class="filter-btn {% if selected_state==s %}active{% endif %}">{{ s }}</a>
+  {% endfor %}
+</div>
+
+{% if schools %}
+<div class="schools-grid">
+  {% for school in schools %}
+  <div class="school-card">
+    <div class="school-header">
+      <div>
+        <h3>{{ school.name }}</h3>
+        <p class="school-meta">📍 {{ school.location }}</p>
+      </div>
+      <span class="state-badge">{{ school.state }}</span>
+    </div>
+    <p class="school-desc">{{ school.description }}</p>
+
+    {% if school.siwes_discount_pct %}
+    <div class="discount-banner">
+      🎓 <strong>SIWES Students Save {{ school.siwes_discount_pct }}%</strong><br/>
+      <small>{{ school.siwes_discount_note }}</small>
+    </div>
+    {% endif %}
+
+    <div class="course-list">
+      {% for course in school.courses %}
+      <div class="course-row">
+        <div class="course-info">
+          <span class="course-name">{{ course.name }}</span>
+          <span class="course-meta">{{ course.duration_months }} months</span>
+        </div>
+        <div class="course-price">
+          {% if course.siwes_price_ngn and course.siwes_price_ngn != course.price_ngn %}
+            <span class="price-full">₦{{ "{:,}".format(course.price_ngn) }}</span>
+            <span class="price-siwes">₦{{ "{:,}".format(course.siwes_price_ngn) }}</span>
+            <span class="price-badge">-{{ course.discount_pct }}%</span>
+          {% else %}
+            <span class="price-siwes">₦{{ "{:,}".format(course.price_ngn) }}</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('schools.take_test', course_id=course.id) }}" class="btn-xs">
+          Take Test →
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="school-footer">
+      <a href="{{ url_for('schools.detail', school_id=school.id) }}" class="btn-ghost">View details</a>
+      {% if school.website %}
+        <a href="{{ school.website }}" target="_blank" class="btn-ghost">Website ↗</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>No schools found for this state.</p>
+  <a href="{{ url_for('schools.listing') }}" class="btn-ghost">Show all states</a>
+</div>
+{% endif %}
+
+<style>
+.filter-bar { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+.filter-btn { padding:.4rem .9rem; border-radius:20px; border:1px solid var(--border); color:var(--muted); text-decoration:none; font-size:.82rem; transition:all .2s; }
+.filter-btn.active, .filter-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.schools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:1.4rem; }
+.school-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; display:flex; flex-direction:column; gap:1rem; }
+.school-header { display:flex; justify-content:space-between; align-items:flex-start; }
+.school-header h3 { font-size:1.05rem; font-weight:600; }
+.school-meta { color:var(--muted); font-size:.82rem; margin-top:.2rem; }
+.school-desc { color:var(--muted); font-size:.86rem; line-height:1.5; }
+.state-badge { background:var(--surface2); border:1px solid var(--border); padding:.2rem .6rem; border-radius:20px; font-size:.75rem; color:var(--muted); flex-shrink:0; }
+.discount-banner { background:#071d11; border:1px solid var(--green); border-radius:7px; padding:.7rem .9rem; font-size:.82rem; color:#bbf7d0; }
+.course-list { display:flex; flex-direction:column; gap:.6rem; }
+.course-row { display:flex; align-items:center; gap:.8rem; padding:.5rem .7rem; background:var(--surface2); border-radius:7px; }
+.course-info { flex:1; }
+.course-name { font-size:.88rem; font-weight:500; display:block; }
+.course-meta { font-size:.75rem; color:var(--muted); }
+.course-price { text-align:right; }
+.price-full { color:var(--muted); text-decoration:line-through; font-size:.78rem; display:block; }
+.price-siwes { color:var(--green); font-weight:600; font-size:.9rem; display:block; }
+.price-badge { background:#071d11; color:var(--green); border:1px solid var(--green); border-radius:20px; padding:.1rem .5rem; font-size:.72rem; font-weight:600; }
+.school-footer { display:flex; gap:1rem; border-top:1px solid var(--border); padding-top:.8rem; }
+</style>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}My Placement Result — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Placement Result</h1>
+</div>
+
+{% if not placement %}
+<div class="empty-state">
+  <div class="empty-icon">🕐</div>
+  <h3>No placement assigned yet</h3>
+  <p>The placement algorithm has not run yet, or your profile was not included. Ensure your CV is uploaded and check back after the next placement run.</p>
+  <a href="{{ url_for('student.upload_cv') }}" class="btn-primary">Upload / Check CV</a>
+</div>
+{% else %}
+
+<!-- ── Match card ───────────────────────────── -->
+<div class="result-hero">
+  <div class="result-company">
+    <span class="result-icon">🏢</span>
+    <div>
+      <h2>{{ company.name }}</h2>
+      <p>{{ jd.title }} · {{ company.location }}</p>
+      {% if company.website %}
+        <a href="{{ company.website }}" target="_blank" class="company-link">{{ company.website }}</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="score-circle {% if placement.match_score >= 0.75 %}high{% elif placement.match_score >= 0.5 %}mid{% else %}low{% endif %}">
+    <span>{{ "%.0f"|format(placement.match_score * 100) }}%</span>
+    <small>Match</small>
+  </div>
+</div>
+
+<!-- ── Company info ──────────────────────────── -->
+<div class="dash-grid">
+  <div class="card">
+    <h3>Company Details</h3>
+    <table class="info-table">
+      <tr><td>Industry</td><td>{{ company.industry }}</td></tr>
+      <tr><td>Location</td><td>{{ company.location }}</td></tr>
+      <tr><td>Email</td><td>{{ company.email }}</td></tr>
+      {% if company.description %}
+      <tr><td>About</td><td>{{ company.description }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Role Requirements</h3>
+    <p><strong>{{ jd.title }}</strong></p>
+    <div class="skill-tags">
+      {% for skill in jd.get_required_skills() %}
+        <span class="tag {% if skill in student.cv.get_skills() %}matched{% endif %}">{{ skill }}</span>
+      {% endfor %}
+    </div>
+    {% if jd.additional_requirements %}
+    <p class="mt"><strong>Additional requirements:</strong><br/>{{ jd.additional_requirements }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── SHAP explanation ──────────────────────── -->
+{% if shap_rows %}
+<div class="card mt">
+  <h3>Why this match? — SHAP Skill Contributions</h3>
+  <p class="muted">Each bar shows how much a skill contributed to your match score. Green = mutual match. Blue = you have it, not required. Red = required, you're missing it.</p>
+
+  <div class="shap-bars">
+    {% for row in shap_rows[:12] %}
+    <div class="shap-row">
+      <span class="shap-label">{{ row.feature_name }}</span>
+      <div class="shap-bar-wrap">
+        <div class="shap-bar
+          {% if row.in_student_cv and row.in_job_req %}mutual
+          {% elif row.in_student_cv %}extra
+          {% else %}gap{% endif %}"
+          style="width: {{ [([row.shap_value|abs * 400, 4]|max), 240]|min }}px">
+        </div>
+        <span class="shap-val">{{ "%.4f"|format(row.shap_value) }}</span>
+      </div>
+      <span class="shap-flag">
+        {% if row.in_student_cv and row.in_job_req %}✅
+        {% elif row.in_student_cv %}➕
+        {% else %}❌{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Feedback summary -->
+<div class="dash-grid mt">
+  <div class="card feedback-card strength">
+    <h3>💪 Your Strengths</h3>
+    {% if strengths %}
+      {% for s in strengths %}<span class="tag green">{{ s.feature_name }}</span>{% endfor %}
+    {% else %}<p class="muted">No mutual matches found.</p>{% endif %}
+  </div>
+  <div class="card feedback-card gap">
+    <h3>📚 Skills to Develop</h3>
+    {% if skill_gaps %}
+      {% for g in skill_gaps %}<span class="tag red">{{ g.feature_name }}</span>{% endfor %}
+    {% else %}<p class="muted">No critical skill gaps detected.</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Student Registration — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Student Registration</h1>
+  <p>Create your SIWES placement profile — takes 2 minutes</p>
+</div>
+
+<!-- Embed location map as JSON for Alpine (no network call needed) -->
+<script>
+  const STATES_LOCATIONS = {{ states_locations | default({}) | tojson }};
+</script>
+
+<div class="form-card wide"
+     x-data="{
+       state:     '{{ form.get("state","") | e }}',
+       location:  '{{ form.get("location","") | e }}',
+       get locs() { return STATES_LOCATIONS[this.state] || []; },
+       onStateChange() { this.location = ''; }
+     }">
+
+  <form method="POST" class="grid-form" autocomplete="off">
+
+    <!-- ── Personal ─────────────────────────────── -->
+    <h3 class="section-head">Personal Information</h3>
+
+    <div class="field">
+      <label>Full name *</label>
+      <input type="text" name="name" value="{{ form.get('name','') }}"
+             placeholder="e.g. Emeka Okafor" required/>
+    </div>
+
+    <div class="field">
+      <label>Email address *</label>
+      <input type="email" name="email" value="{{ form.get('email','') }}"
+             placeholder="you@university.edu.ng" required/>
+    </div>
+
+    <div class="field">
+      <label>Phone number</label>
+      <input type="tel" name="phone" value="{{ form.get('phone','') }}"
+             placeholder="080XXXXXXXX"/>
+    </div>
+
+    <div class="field">
+      <label>Matriculation number</label>
+      <input type="text" name="matric_no" value="{{ form.get('matric_no','') }}"
+             placeholder="190302001"/>
+    </div>
+
+    <!-- ── Academic ──────────────────────────────── -->
+    <h3 class="section-head">Academic Information</h3>
+
+    <div class="field">
+      <label>University *</label>
+      <input type="text" name="university" value="{{ form.get('university','') }}"
+             placeholder="University of Lagos" required/>
+    </div>
+
+    <div class="field">
+      <label>Department *</label>
+      <select name="department" required>
+        <option value="">— Select department —</option>
+        {% for d in ["Computer Science","Software Engineering","Information Technology",
+                     "Computer Engineering","Electrical Electronics","Data Science","Cyber Security"] %}
+          <option value="{{ d }}" {% if form.get('department')==d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Current level *</label>
+      <select name="level" required>
+        <option value="300" {% if form.get('level','300')=='300' %}selected{% endif %}>300 Level</option>
+        <option value="400" {% if form.get('level')=='400' %}selected{% endif %}>400 Level</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>SIWES track *</label>
+      <select name="track">
+        <option value="placement" {% if form.get('track','placement')=='placement' %}selected{% endif %}>
+          Company Placement (free, CV-based)
+        </option>
+        <option value="tech_school" {% if form.get('track')=='tech_school' %}selected{% endif %}>
+          Tech School (paid, skill-test based)
+        </option>
+      </select>
+    </div>
+
+    <!-- ── Location ──────────────────────────────── -->
+    <h3 class="section-head">📍 Location Preferences</h3>
+
+    <div class="field">
+      <label>Preferred state *
+        <span class="hint">(which state do you want to do SIWES in?)</span>
+      </label>
+      <select name="state" x-model="state" @change="onStateChange()" required>
+        <option value="">— Select a state —</option>
+        {% for s in states %}
+          <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+      <p class="field-note" x-show="!state" style="color:var(--amber)">
+        ⚠ Select a state to load available areas below.
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Preferred area / local government *
+        <span class="hint">(within your chosen state)</span>
+      </label>
+      <select name="location" x-model="location" required :disabled="locs.length === 0">
+        <option value="">
+          <span x-text="state ? '— Select an area —' : '— Select state first —'"></span>
+        </option>
+        <template x-for="loc in locs" :key="loc">
+          <option :value="loc" x-text="loc + ', ' + state"></option>
+        </template>
+      </select>
+      <p class="field-note">
+        Companies in this area will be prioritised in your placement matching.
+      </p>
+    </div>
+
+    <!-- ── Profile extras ────────────────────────── -->
+    <h3 class="section-head">Additional Details <span class="hint">(optional)</span></h3>
+
+    <div class="field full-width">
+      <label>Short bio / personal statement</label>
+      <textarea name="bio" rows="3"
+                placeholder="Tell companies about your interests, goals and what you want to learn…">{{ form.get('bio','') }}</textarea>
+    </div>
+
+    <div class="field">
+      <label>LinkedIn URL</label>
+      <input type="url" name="linkedin" value="{{ form.get('linkedin','') }}"
+             placeholder="https://linkedin.com/in/yourname"/>
+    </div>
+
+    <div class="field">
+      <label>GitHub URL</label>
+      <input type="url" name="github" value="{{ form.get('github','') }}"
+             placeholder="https://github.com/yourname"/>
+    </div>
+
+    <!-- ── Security ──────────────────────────────── -->
+    <h3 class="section-head">Account Security</h3>
+
+    <div class="field" x-data="passwordStrength()">
+      <label>Password *</label>
+      <div class="password-wrap" x-data="{ show: false }">
+        <input :type="show ? 'text' : 'password'" name="password"
+               placeholder="Min. 8 characters" required minlength="8"
+               @input="$dispatch('pwd', {val: $event.target.value})"/>
+        <button type="button" class="password-toggle" @click="show = !show" aria-label="Show password">
+          <span x-text="show ? '🙈' : '👁'"></span>
+        </button>
+      </div>
+      <!-- Listen to the dispatched event on parent x-data -->
+      <div @pwd.window="password = $event.detail.val">
+        <div class="strength-bar">
+          <template x-for="i in 4" :key="i">
+            <div class="strength-seg"
+                 :class="strength >= i ? 'filled-' + strength : ''"></div>
+          </template>
+        </div>
+        <p class="strength-label" x-show="password.length > 0">
+          Strength: <span x-text="label" :style="strength<=1?'color:var(--red)':strength<=2?'color:var(--amber)':'color:var(--green)'"></span>
+        </p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Confirm password *</label>
+      <div class="password-wrap" x-data="{ show: false }">
+        <input :type="show ? 'text' : 'password'" name="confirm"
+               placeholder="Repeat password" required/>
+        <button type="button" class="password-toggle" @click="show = !show" aria-label="Show password">
+          <span x-text="show ? '🙈' : '👁'"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field full-width actions">
+      <button type="submit" class="btn-primary">Create student account →</button>
+      <a href="{{ url_for('auth.login') }}" class="btn-ghost">Already registered? Log in</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

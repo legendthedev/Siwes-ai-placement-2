@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Confirm Enrollment — {{ course.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Confirm Enrollment</h1>
+  <p>{{ course.name }} · {{ course.school.name }}</p>
+</div>
+
+<div class="result-hero" style="margin-bottom:1.5rem">
+  <div class="result-company">
+    <span class="result-icon">🎓</span>
+    <div>
+      <h2>{{ course.school.name }}</h2>
+      <p>{{ course.name }} · {{ course.duration_months }} months</p>
+      <p class="muted" style="font-size:.85rem">📍 {{ course.school.location }}</p>
+    </div>
+  </div>
+  <div class="score-circle high">
+    <span>{{ attempt.score|int }}%</span>
+    <small>Test score</small>
+  </div>
+</div>
+
+<div class="dash-grid">
+  <div class="card">
+    <h3>💰 Fee Breakdown</h3>
+    <table class="info-table">
+      <tr><td>Standard fee</td>
+          <td style="text-decoration:line-through;color:var(--muted)">₦{{ "{:,}".format(course.price_ngn) }}</td></tr>
+      <tr><td>SIWES discount</td>
+          <td style="color:var(--green)">− {{ course.discount_pct }}%</td></tr>
+      <tr><td><strong>Your SIWES fee</strong></td>
+          <td><strong style="color:var(--green);font-size:1.15rem">
+            ₦{{ "{:,}".format(course.siwes_price_ngn or course.price_ngn) }}
+          </strong></td></tr>
+    </table>
+    <div class="discount-banner mt">🎓 {{ course.school.siwes_discount_note }}</div>
+  </div>
+
+  <div class="card">
+    <h3>👤 Your Profile</h3>
+    <table class="info-table">
+      <tr><td>Name</td><td>{{ student.name }}</td></tr>
+      <tr><td>University</td><td>{{ student.university }}</td></tr>
+      <tr><td>Department</td><td>{{ student.department }}</td></tr>
+      <tr><td>Level</td><td>{{ student.level }}</td></tr>
+      <tr><td>Test score</td>
+          <td><span class="badge-ok">{{ attempt.score }}% ✅ Passed</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h3>📋 What Happens Next</h3>
+    <div style="display:flex;flex-direction:column;gap:.8rem;margin-top:.5rem">
+      {% for step, desc in [
+        ("Submit enrollment", "Click the button below to submit your enrollment request."),
+        ("School notification", "The school admin reviews your application."),
+        ("Payment", "Pay the SIWES fee. Bank details are sent via email after confirmation."),
+        ("Activation", "Once confirmed, your enrollment is activated and SIWES record updated."),
+      ] %}
+      <div style="display:flex;gap:.8rem;align-items:flex-start">
+        <span style="background:var(--accent);color:#fff;border-radius:50%;width:26px;height:26px;
+                     display:flex;align-items:center;justify-content:center;font-size:.75rem;
+                     font-weight:700;flex-shrink:0">{{ loop.index }}</span>
+        <div>
+          <p style="font-weight:600;font-size:.88rem">{{ step }}</p>
+          <p class="muted" style="font-size:.82rem">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<form method="POST" class="mt" style="display:flex;gap:1rem;align-items:center"
+      onsubmit="return confirm('Submit enrollment? Payment of ₦{{ "{:,}".format(course.siwes_price_ngn or course.price_ngn) }} will be due after confirmation.')">
+  <button type="submit" class="btn-primary">✅ Submit Enrollment Request</button>
+  <a href="{{ url_for('schools.detail', school_id=course.school_id) }}" class="btn-ghost">Cancel</a>
+</form>
+{% endblock %}

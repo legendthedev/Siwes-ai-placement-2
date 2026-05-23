@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Company Registration — SIWES Portal{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Company Registration</h1>
+  <p>Register your organisation to participate in SIWES placement</p>
+</div>
+
+<!-- Embed location map as JSON for Alpine (no network call needed) -->
+<script>
+  const STATES_LOCATIONS = {{ states_locations | tojson }};
+</script>
+
+<div class="form-card wide"
+     x-data="{
+       state:    '{{ form.get("state","") | e }}',
+       location: '{{ form.get("location","") | e }}',
+       get locs() { return STATES_LOCATIONS[this.state] || []; },
+       onStateChange() { this.location = ''; }
+     }">
+
+  <form method="POST" class="grid-form" autocomplete="off">
+
+    <!-- ── Company Information ──────────────────── -->
+    <h3 class="section-head">Company Information</h3>
+
+    <div class="field">
+      <label>Company / organisation name *</label>
+      <input type="text" name="company_name"
+             value="{{ form.get('company_name','') }}"
+             placeholder="e.g. Flutterwave" required/>
+    </div>
+
+    <div class="field">
+      <label>Industry *</label>
+      <select name="industry" required>
+        <option value="">— Select industry —</option>
+        {% for ind in ["Fintech","Banking","Telecommunications","E-Commerce","Cybersecurity",
+                       "HealthTech","EdTech","Logistics Tech","Media Tech","Payment Technology",
+                       "Cloud / Enterprise IT","Software Development","Government ICT",
+                       "Engineering Services","Research & Innovation","Other"] %}
+          <option value="{{ ind }}" {% if form.get('industry')==ind %}selected{% endif %}>{{ ind }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field full-width">
+      <label>Company description *</label>
+      <textarea name="description" rows="4" required
+        placeholder="Brief overview of what your company does, your tech stack, and the kind of work SIWES students will do…">{{ form.get('description','') }}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Company website</label>
+      <input type="url" name="website" value="{{ form.get('website','') }}"
+             placeholder="https://yourcompany.com"/>
+    </div>
+
+    <!-- ── Location ──────────────────────────────── -->
+    <h3 class="section-head">📍 Office Location</h3>
+
+    <div class="field">
+      <label>State *
+        <span class="hint">(which state is your office in?)</span>
+      </label>
+      <select name="state" x-model="state" @change="onStateChange()" required>
+        <option value="">— Select a state —</option>
+        {% for s in states %}
+          <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+      <p class="field-note" x-show="!state" style="color:var(--amber)">
+        ⚠ Select a state to load the area list below.
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Area / district *</label>
+      <select name="location" x-model="location" required :disabled="locs.length === 0">
+        <option value="">
+          <span x-text="state ? '— Select an area —' : '— Select state first —'"></span>
+        </option>
+        <template x-for="loc in locs" :key="loc">
+          <option :value="loc" x-text="loc + ', ' + state"></option>
+        </template>
+      </select>
+      <p class="field-note">
+        Students near this location will be prioritised in the matching algorithm.
+      </p>
+    </div>
+
+    <!-- ── Admin Account ─────────────────────────── -->
+    <h3 class="section-head">Admin Account</h3>
+
+    <div class="field">
+      <label>Work email address *</label>
+      <input type="email" name="email" value="{{ form.get('email','') }}"
+             placeholder="hr@yourcompany.com" required/>
+    </div>
+
+    <div class="field" x-data="passwordStrength()">
+      <label>Password *</label>
+      <div class="password-wrap" x-data="{ show: false }">
+        <input :type="show ? 'text' : 'password'" name="password"
+               placeholder="Min. 8 characters" required minlength="8"
+               @input="$dispatch('apwd', {val: $event.target.value})"/>
+        <button type="button" class="password-toggle" @click="show = !show" aria-label="Show password">
+          <span x-text="show ? '🙈' : '👁'"></span>
+        </button>
+      </div>
+      <div @apwd.window="password = $event.detail.val">
+        <div class="strength-bar">
+          <template x-for="i in 4" :key="i">
+            <div class="strength-seg"
+                 :class="strength >= i ? 'filled-' + strength : ''"></div>
+          </template>
+        </div>
+        <p class="strength-label" x-show="password.length > 0">
+          Strength: <span x-text="label"
+            :style="strength<=1?'color:var(--red)':strength<=2?'color:var(--amber)':'color:var(--green)'"></span>
+        </p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Confirm password *</label>
+      <div class="password-wrap" x-data="{ show: false }">
+        <input :type="show ? 'text' : 'password'" name="confirm"
+               placeholder="Repeat password" required/>
+        <button type="button" class="password-toggle" @click="show = !show" aria-label="Show password">
+          <span x-text="show ? '🙈' : '👁'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Notice ────────────────────────────────── -->
+    <div class="info-box full-width">
+      <strong>📋 Verification notice:</strong> Newly registered companies are marked
+      <em>pending verification</em> by the SIWES administrator. You can add job
+      descriptions immediately, but your roles will only appear in the placement
+      algorithm once your account is approved. You will receive a notification when verified.
+    </div>
+
+    <div class="field full-width actions">
+      <button type="submit" class="btn-primary">Register company →</button>
+      <a href="{{ url_for('auth.login') }}" class="btn-ghost">Already registered? Log in</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

@@ -8,3 +8,4 @@ etc/
 pyvenv.cfg
 .sixth/
 __pycache__/
+uploads/

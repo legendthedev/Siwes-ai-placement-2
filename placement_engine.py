@@ -137,7 +137,7 @@ class PlacementEngine:
                           "score": m.match_score} for m in gs_output.matched],
                 unmatched=[{"student_id": u.student_id} for u in gs_output.unmatched],
                 student_prefs=student_prefs, jd_quotas=jd_quotas,
-                student_dept=s_dept, score_matrix=score_lookup)
+                student_dept=s_dept, score_lookup=score_lookup)
 
             batch.placed_students = len(gs_output.matched)
             batch.total_students  = len(students)
